@@ -1,4 +1,4 @@
-------
+---
 title: "Crop Yield"
 output: html_notebook
 ---
@@ -11,423 +11,84 @@ library(lmtest)
 library(sandwich)
 ```
 
-
 # Task 1
 ```{r}
-# Load file as dataframe
 farm_df <- read.csv("farms.csv")
 ```
 
-
 # Task 2
 ```{r}
-# Inspect dataframe
 head(farm_df)
 ```
 
-
 # Task 3
 ```{r}
-# Balance plot for the average age
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "age_avg",
-         plot.type = "density")
+bal.plot(farm_df$cover_10, farm_df$age_avg, 
+         xlab = "Cover crop use", 
+         ylab = "Average age",
+         main = "Age balance plot")
 ```
-
 
 # Task 4
 ```{r}
-# Balance plot for geographic region
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "region")
+bal.plot(farm_df$cover_10, farm_df$region, 
+         xlab = "Cover crop use", 
+         ylab = "Region",
+         main = "Region balance plot")
 ```
-
 
 # Task 5
 ```{r}
-# Balance table to show SMD and variance ratio of between groups
-bal.table(data = farm_df,
-          treat = "cover_10",
-          variables = c("region", "total_avg", "age_avg", "experience_avg", 
-                        "insurance_avg", "easement_p", "conservation_till_avg", 
-                        "fertilizer_per_area"))
+bal.tab(cover_10 ~ region + total_avg + age_avg + experience_avg + 
+          insurance_avg + easement_p + conservation_till_avg + fertilizer_per_area,
+        data = farm_df,
+        un = TRUE)
 ```
-
 
 # Task 6
 ```{r}
-# Calculate IPTW weights with initial propensity score model
-farm_iptw <- weightit("cover_10 ~ region + total_avg + insurance_avg + fertilizer_per_area",
+farm_iptw <- weightit(cover_10 ~ region + total_avg + insurance_avg + fertilizer_per_area,
                       data = farm_df,
                       method = "iptw",
-                      estimate = "ATE")
+                      estimand = "ATE")
 ```
-
 
 # Task 7
 ```{r}
-# Love plot with threshold lines to show SMD balance before and after weighting
-love.plot(farm_iptw, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
+love.plot(farm_iptw, binary = "smd", thresholds = c(m = .1))
 ```
-
 
 # Task 8
 ```{r}
-# Re-calculate IPTW weights with updated propensity score model
-farm_iptw2 <- weightit("cover_10 ~ region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg",
+farm_iptw2 <- weightit(cover_10 ~ region + total_avg + age_avg + experience_avg + 
+                         easement_p + conservation_till_avg,
                        data = farm_df,
                        method = "iptw",
-                       estimate = "ATE")
+                       estimand = "ATE")
 ```
-
 
 # Task 9
 ```{r}
-# Plot Love plot of SMDs with threshold lines to show balance before and after IPTW procedure
-love.plot(farm_iptw2, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
+love.plot(farm_iptw2, binary = "smd", thresholds = c(m = .1))
 ```
-
 
 # Task 10
 ```{r}
-# Balance plot of propensity scores before and after weighting
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "cover_10",
-         plot.type = "density")
+love.plot(farm_iptw2, stats = "ps", abs = FALSE)
 ```
-
 
 # Task 11
 ```{r}
-# Fit outcome regression model
-yield_mod <- lm(total_yield ~ cover_10 + region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg,
+yield_mod <- lm(total_yield ~ cover_10 + region + total_avg + age_avg + 
+                  experience_avg + easement_p + conservation_till_avg,
                 data = farm_df,
                 weights = farm_iptw2$weights)
 ```
 
-
 # Task 12
 ```{r}
-# Estimate regression coefficients for weighted outcome model with robust standard errors
-coeftest(yield_mod, vcov = vcovHC, type = "HC1")
+coeftest(yield_mod, vcov = vcovHC(yield_mod, type = "HC1"))
 ```
-
 
 # Task 13
-
-
-## Results Interpretation:
-
-Looking at the regression parameter for the treatment variable (`cover_10`) from the `coeftest()` output:
-
-**If the coefficient is positive** (e.g., +1.9): 
-- The estimated causal effect of having ≥10% of farms use cover crops is an **increase in wheat yield of [coefficient] bushels per acre**
-- This represents the Average Treatment Effect (ATE) - the expected change in yield if a county moved from <10% to ≥10% cover crop adoption
-- This aligns with previous research showing wheat yields increased by 1.9 bushels/acre (+2.8%) with cover crops
-
-**If the coefficient is negative**:
-- Cover crop use would decrease wheat yields by [coefficient] bushels per acre
-
-**Key points for interpretation**:
-- The **robust standard errors** account for potential heteroskedasticity in the weighted regression
-- Because IPTW balanced the confounders (region, farm size, operator age/experience, easements, conservation tillage), this estimate represents a **causal effect**, not just correlation
-- The effect is measured at the **county level** (not individual farm level)
-
-**Example interpretation**: "Counties with at least 10% cover crop adoption had wheat yields that were [X] bushels per acre higher than counties with less than 10% adoption, after adjusting for regional differences, farm size, operator characteristics, land easements, and conservation tillage. This suggests cover crops causally increase wheat yields."
-title: "Crop Yield"
-output: html_notebook
-------
-title: "Crop Yield"
-output: html_notebook
----
-
-# Import libraries
-```{r, message=FALSE}
-library(cobalt)
-library(WeightIt)
-library(lmtest)
-library(sandwich)
-```
-
-
-# Task 1
-```{r}
-# Load file as dataframe
-farm_df <- read.csv("farms.csv")
-```
-
-
-# Task 2
-```{r}
-# Inspect dataframe
-head(farm_df)
-```
-
-
-# Task 3
-```{r}
-# Balance plot for the average age
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "age_avg",
-         plot.type = "density")
-```
-
-
-# Task 4
-```{r}
-# Balance plot for geographic region
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "region")
-```
-
-
-# Task 5
-```{r}
-# Balance table to show SMD and variance ratio of between groups
-bal.table(data = farm_df,
-          treat = "cover_10",
-          variables = c("region", "total_avg", "age_avg", "experience_avg", 
-                        "insurance_avg", "easement_p", "conservation_till_avg", 
-                        "fertilizer_per_area"))
-```
-
-
-# Task 6
-```{r}
-# Calculate IPTW weights with initial propensity score model
-farm_iptw <- weightit("cover_10 ~ region + total_avg + insurance_avg + fertilizer_per_area",
-                      data = farm_df,
-                      method = "iptw",
-                      estimate = "ATE")
-```
-
-
-# Task 7
-```{r}
-# Love plot with threshold lines to show SMD balance before and after weighting
-love.plot(farm_iptw, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
-```
-
-
-# Task 8
-```{r}
-# Re-calculate IPTW weights with updated propensity score model
-farm_iptw2 <- weightit("cover_10 ~ region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg",
-                       data = farm_df,
-                       method = "iptw",
-                       estimate = "ATE")
-```
-
-
-# Task 9
-```{r}
-# Plot Love plot of SMDs with threshold lines to show balance before and after IPTW procedure
-love.plot(farm_iptw2, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
-```
-
-
-# Task 10
-```{r}
-# Balance plot of propensity scores before and after weighting
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "cover_10",
-         plot.type = "density")
-```
-
-
-# Task 11
-```{r}
-# Fit outcome regression model
-yield_mod <- lm(total_yield ~ cover_10 + region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg,
-                data = farm_df,
-                weights = farm_iptw2$weights)
-```
-
-
-# Task 12
-```{r}
-# Estimate regression coefficients for weighted outcome model with robust standard errors
-coeftest(yield_mod, vcov = vcovHC, type = "HC1")
-```
-
-
-# Task 13
-
-
-## Results Interpretation:
-
-Looking at the regression parameter for the treatment variable (`cover_10`) from the `coeftest()` output:
-
-**If the coefficient is positive** (e.g., +1.9): 
-- The estimated causal effect of having ≥10% of farms use cover crops is an **increase in wheat yield of [coefficient] bushels per acre**
-- This represents the Average Treatment Effect (ATE) - the expected change in yield if a county moved from <10% to ≥10% cover crop adoption
-- This aligns with previous research showing wheat yields increased by 1.9 bushels/acre (+2.8%) with cover crops
-
-**If the coefficient is negative**:
-- Cover crop use would decrease wheat yields by [coefficient] bushels per acre
-
-**Key points for interpretation**:
-- The **robust standard errors** account for potential heteroskedasticity in the weighted regression
-- Because IPTW balanced the confounders (region, farm size, operator age/experience, easements, conservation tillage), this estimate represents a **causal effect**, not just correlation
-- The effect is measured at the **county level** (not individual farm level)
-
-**Example interpretation**: "Counties with at least 10% cover crop adoption had wheat yields that were [X] bushels per acre higher than counties with less than 10% adoption, after adjusting for regional differences, farm size, operator characteristics, land easements, and conservation tillage. This suggests cover crops causally increase wheat yields."
-
-# Import libraries
-```{r, message=FALSE}
-library(cobalt)
-library(WeightIt)
-library(lmtest)
-library(sandwich)
-```
-
-
-# Task 1
-```{r}
-# Load file as dataframe
-farm_df <- read.csv("farms.csv")
-```
-
-
-# Task 2
-```{r}
-# Inspect dataframe
-head(farm_df)
-```
-
-
-# Task 3
-```{r}
-# Balance plot for the average age
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "age_avg",
-         plot.type = "density")
-```
-
-
-# Task 4
-```{r}
-# Balance plot for geographic region
-bal.plot(data = farm_df,
-         treat = "cover_10",
-         variables = "region")
-```
-
-
-# Task 5
-```{r}
-# Balance table to show SMD and variance ratio of between groups
-bal.table(data = farm_df,
-          treat = "cover_10",
-          variables = c("region", "total_avg", "age_avg", "experience_avg", 
-                        "insurance_avg", "easement_p", "conservation_till_avg", 
-                        "fertilizer_per_area"))
-```
-
-
-# Task 6
-```{r}
-# Calculate IPTW weights with initial propensity score model
-farm_iptw <- weightit("cover_10 ~ region + total_avg + insurance_avg + fertilizer_per_area",
-                      data = farm_df,
-                      method = "iptw",
-                      estimate = "ATE")
-
-# Validate weights - check for excessively large values
-summary(farm_iptw$weights)
-```
-
-
-# Task 7
-```{r}
-# Love plot with threshold lines to show SMD balance before and after weighting
-love.plot(farm_iptw, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
-```
-
-
-# Task 8
-```{r}
-# Re-calculate IPTW weights with updated propensity score model
-farm_iptw2 <- weightit("cover_10 ~ region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg",
-                       data = farm_df,
-                       method = "iptw",
-                       estimate = "ATE")
-
-# Validate weights - check for excessively large values
-summary(farm_iptw2$weights)
-```
-
-
-# Task 9
-```{r}
-# Plot Love plot of SMDs with threshold lines to show balance before and after IPTW procedure
-love.plot(farm_iptw2, 
-          binary = "smd", 
-          thresholds = (m = 0.1))
-```
-
-
-# Task 10
-```{r}
-# Balance plot of propensity scores before and after weighting
-bal.plot(data = farm_iptw2,
-         treat = "cover_10",
-         plot.type = "density")
-```
-
-
-# Task 11
-```{r}
-# Fit outcome regression model
-yield_mod <- lm(total_yield ~ cover_10 + region + total_avg + age_avg + experience_avg + easement_p + conservation_till_avg,
-                data = farm_df,
-                weights = farm_iptw2$weights)
-```
-
-
-# Task 12
-```{r}
-# Estimate regression coefficients for weighted outcome model with robust standard errors
-coeftest(yield_mod, vcov = vcovHC, type = "HC1")
-```
-
-
-# Task 13
-
-
-## Results Interpretation:
-
-Looking at the regression parameter for the treatment variable (`cover_10`) from the `coeftest()` output:
-
-**If the coefficient is positive** (e.g., +1.9): 
-- The estimated causal effect of having ≥10% of farms use cover crops is an **increase in wheat yield of [coefficient] bushels per acre**
-- This represents the Average Treatment Effect (ATE) - the expected change in yield if a county moved from <10% to ≥10% cover crop adoption
-- This aligns with previous research showing wheat yields increased by 1.9 bushels/acre (+2.8%) with cover crops
-
-**If the coefficient is negative**:
-- Cover crop use would decrease wheat yields by [coefficient] bushels per acre
-
-**Key points for interpretation**:
-- The **robust standard errors** account for potential heteroskedasticity in the weighted regression
-- Because IPTW balanced the confounders (region, farm size, operator age/experience, easements, conservation tillage), this estimate represents a **causal effect**, not just correlation
-- The effect is measured at the **county level** (not individual farm level)
-- The weights have been validated to ensure no excessively large values that could destabilize the estimate
-
-**Example interpretation**: "Counties with at least 10% cover crop adoption had wheat yields that were [X] bushels per acre higher than counties with less than 10% adoption, after adjusting for regional differences, farm size, operator characteristics, land easements, and conservation tillage. This suggests cover crops causally increase wheat yields."
+The coefficient on `cover_10` is the estimated effect of cover crop adoption on wheat yield in bushels per acre, after weighting and adjustment. If it is positive, counties with at least 10% cover-crop use are associated with higher wheat yields; if negative, the association is lower yields.
